@@ -15,6 +15,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -60,6 +61,8 @@ class CourseServiceTest {
     @Test
     void deleteRemovesDependentsFirst() {
         when(courses.findById(1L)).thenReturn(Optional.of(TestIds.withId(new Course("CS101", "Algorithms", 2), 1L)));
+        when(courses.findByRequiredCourses_Id(1L)).thenReturn(List.of());
+        when(courses.findByEquivalentCourses_Id(1L)).thenReturn(List.of());
 
         service.delete(1L);
 
@@ -67,5 +70,28 @@ class CourseServiceTest {
         verify(exams).deleteByCourseId(1L);
         verify(registrations).deleteByCourseId(1L);
         verify(courses).deleteById(1L);
+    }
+
+    @Test
+    void addPrerequisiteRejectsASelfLink() {
+        when(courses.findById(1L)).thenReturn(Optional.of(TestIds.withId(new Course("CS101", "Algorithms", 2), 1L)));
+
+        assertThatThrownBy(() -> service.addPrerequisite(1L, 1L))
+                .isInstanceOf(ApiException.class)
+                .hasMessage("A course cannot be its own prerequisite");
+    }
+
+    @Test
+    void deleteUnlinksCoursesThatDependOnTheDeletedCourse() {
+        Course target = TestIds.withId(new Course("CS100", "Intro", 20), 1L);
+        Course owner = TestIds.withId(new Course("CS101", "Algorithms", 20), 2L);
+        owner.require(target);
+        when(courses.findById(1L)).thenReturn(Optional.of(target));
+        when(courses.findByRequiredCourses_Id(1L)).thenReturn(List.of(owner));
+        when(courses.findByEquivalentCourses_Id(1L)).thenReturn(List.of());
+
+        service.delete(1L);
+
+        assertThat(owner.requiredCourses()).isEmpty();
     }
 }

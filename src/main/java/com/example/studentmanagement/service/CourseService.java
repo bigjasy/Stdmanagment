@@ -62,11 +62,71 @@ public class CourseService {
     }
 
     public void delete(Long id) {
-        load(id);
+        Course course = load(id);
+        for (Course owner : courses.findByRequiredCourses_Id(id)) {
+            owner.dropRequirement(id);
+        }
+        for (Course owner : courses.findByEquivalentCourses_Id(id)) {
+            owner.dropEquivalent(id);
+        }
         grades.deleteByExamCourseId(id);
         exams.deleteByCourseId(id);
         registrations.deleteByCourseId(id);
         courses.deleteById(id);
+    }
+
+    @Transactional(readOnly = true)
+    public List<CourseResponse> prerequisites(Long courseId) {
+        return load(courseId).requiredCourses().stream().map(CourseResponse::of).toList();
+    }
+
+    public CourseResponse addPrerequisite(Long courseId, Long requiredCourseId) {
+        Course course = load(courseId);
+        Course required = load(requiredCourseId);
+        if (courseId.equals(requiredCourseId)) {
+            throw ApiException.badRequest("A course cannot be its own prerequisite");
+        }
+        if (course.alreadyRequires(requiredCourseId)) {
+            throw ApiException.conflict(required.getCode() + " is already a prerequisite of " + course.getCode());
+        }
+        course.require(required);
+        return CourseResponse.of(course);
+    }
+
+    public CourseResponse removePrerequisite(Long courseId, Long requiredCourseId) {
+        Course course = load(courseId);
+        Course required = load(requiredCourseId);
+        if (!course.dropRequirement(requiredCourseId)) {
+            throw ApiException.badRequest(required.getCode() + " is not a prerequisite of " + course.getCode());
+        }
+        return CourseResponse.of(course);
+    }
+
+    @Transactional(readOnly = true)
+    public List<CourseResponse> equivalents(Long courseId) {
+        return load(courseId).equivalentCourses().stream().map(CourseResponse::of).toList();
+    }
+
+    public CourseResponse addEquivalent(Long courseId, Long equivalentCourseId) {
+        Course course = load(courseId);
+        Course equivalent = load(equivalentCourseId);
+        if (courseId.equals(equivalentCourseId)) {
+            throw ApiException.badRequest("A course cannot be equivalent to itself");
+        }
+        if (course.alreadyAccepts(equivalentCourseId)) {
+            throw ApiException.conflict(equivalent.getCode() + " is already an equivalent of " + course.getCode());
+        }
+        course.acceptEquivalent(equivalent);
+        return CourseResponse.of(course);
+    }
+
+    public CourseResponse removeEquivalent(Long courseId, Long equivalentCourseId) {
+        Course course = load(courseId);
+        Course equivalent = load(equivalentCourseId);
+        if (!course.dropEquivalent(equivalentCourseId)) {
+            throw ApiException.badRequest(equivalent.getCode() + " is not an equivalent of " + course.getCode());
+        }
+        return CourseResponse.of(course);
     }
 
     public Course load(Long id) {

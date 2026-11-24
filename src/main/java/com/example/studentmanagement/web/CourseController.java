@@ -3,6 +3,8 @@ package com.example.studentmanagement.web;
 import com.example.studentmanagement.service.CourseService;
 import com.example.studentmanagement.web.dto.CourseRequest;
 import com.example.studentmanagement.web.dto.CourseResponse;
+import com.example.studentmanagement.web.dto.EquivalentCourseRequest;
+import com.example.studentmanagement.web.dto.PrerequisiteRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -52,5 +54,37 @@ public class CourseController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable Long id) {
         courses.delete(id);
+    }
+
+    @GetMapping("/{id}/prerequisites")
+    public List<CourseResponse> prerequisites(@PathVariable Long id) {
+        return courses.prerequisites(id);
+    }
+
+    @PostMapping("/{id}/prerequisites")
+    @ResponseStatus(HttpStatus.CREATED)
+    public CourseResponse addPrerequisite(@PathVariable Long id, @Valid @RequestBody PrerequisiteRequest request) {
+        return courses.addPrerequisite(id, request.requiredCourseId());
+    }
+
+    @DeleteMapping("/{id}/prerequisites/{requiredCourseId}")
+    public CourseResponse removePrerequisite(@PathVariable Long id, @PathVariable Long requiredCourseId) {
+        return courses.removePrerequisite(id, requiredCourseId);
+    }
+
+    @GetMapping("/{id}/equivalents")
+    public List<CourseResponse> equivalents(@PathVariable Long id) {
+        return courses.equivalents(id);
+    }
+
+    @PostMapping("/{id}/equivalents")
+    @ResponseStatus(HttpStatus.CREATED)
+    public CourseResponse addEquivalent(@PathVariable Long id, @Valid @RequestBody EquivalentCourseRequest request) {
+        return courses.addEquivalent(id, request.equivalentCourseId());
+    }
+
+    @DeleteMapping("/{id}/equivalents/{equivalentCourseId}")
+    public CourseResponse removeEquivalent(@PathVariable Long id, @PathVariable Long equivalentCourseId) {
+        return courses.removeEquivalent(id, equivalentCourseId);
     }
 }

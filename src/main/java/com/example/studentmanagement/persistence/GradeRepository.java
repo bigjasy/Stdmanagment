@@ -3,6 +3,7 @@ package com.example.studentmanagement.persistence;
 import com.example.studentmanagement.domain.Grade;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.time.LocalDate;
 import java.util.List;
 
 public interface GradeRepository extends JpaRepository<Grade, Long> {
@@ -14,4 +15,7 @@ public interface GradeRepository extends JpaRepository<Grade, Long> {
     void deleteByStudentId(Long studentId);
 
     void deleteByExamCourseId(Long courseId);
+
+    List<Grade> findByStudentIdAndExamCourseIdAndExamDateBetween(
+            Long studentId, Long courseId, LocalDate from, LocalDate to);
 }
