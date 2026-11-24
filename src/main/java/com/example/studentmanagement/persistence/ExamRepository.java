@@ -9,5 +9,7 @@ public interface ExamRepository extends JpaRepository<Exam, Long> {
 
     List<Exam> findByCourseId(Long courseId);
 
+    java.util.Optional<Exam> findByExternalId(String externalId);
+
     void deleteByCourseId(Long courseId);
 }

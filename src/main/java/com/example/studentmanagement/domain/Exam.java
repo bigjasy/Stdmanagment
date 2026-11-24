@@ -33,7 +33,18 @@ public class Exam {
     @Column(name = "exam_type", length = 20)
     private ExamType type;
 
+    @Column(name = "external_id", unique = true, length = 80)
+    private String externalId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", length = 20)
+    private ExamStatus status;
+
     protected Exam() {
+    }
+
+    public static Exam blank() {
+        return new Exam();
     }
 
     public Exam(Course course, LocalDate date) {
@@ -60,5 +71,28 @@ public class Exam {
 
     public ExamType getType() {
         return type == null ? ExamType.MIDTERM : type;
+    }
+
+    public String getExternalId() {
+        return externalId;
+    }
+
+    public ExamStatus getStatus() {
+        return status == null ? ExamStatus.ACTIVE : status;
+    }
+
+    public void link(String externalId, ExamStatus status) {
+        this.externalId = externalId;
+        this.status = status;
+    }
+
+    public void refresh(Course course, LocalDate date, ExamType type) {
+        this.course = course;
+        this.date = date;
+        this.type = type;
+    }
+
+    public void cancel() {
+        this.status = ExamStatus.CANCELLED;
     }
 }

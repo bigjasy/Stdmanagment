@@ -35,7 +35,7 @@ The API listens on http://localhost:8080.
 
     mvn test
 
-The suite does not need MySQL. This branch has **33 tests**.
+The suite does not need MySQL. This branch has **36 tests**.
 
 ## Git hooks
 
@@ -217,13 +217,46 @@ About 2 hours, including a full `mvn test` run on JDK 17.
 
 Deleting a student failed once notifications referenced the student. `StudentService.delete` now removes notification and preference rows first.
 
+## Changes 6 — Externalized exams
+
+Exams are created and read through an external REST service. This API keeps a local mirror so grades still use a stable numeric id, old exams stay readable during an outage, and course averages and prerequisite checks keep working. `external.exams.base-url` defaults to `http://localhost:9090`, with a 2 second connect timeout and a 3 second read timeout.
+
+A network error, timeout, or HTTP 5xx is unavailable: a write answers **503** and stores nothing, and a read answers from the local mirror. An HTTP 4xx or a bad payload answers **502**. If the external service returns 404 for a known mirror, the mirror is marked `CANCELLED` and kept. Once an exam has grades, a refresh updates only its external id and status. The date, course, and category stay frozen.
+
+### How many classes were changed
+
+**16 Java classes** — 14 production and 2 test classes, plus this README and `application.properties`:
+
+- Production added: `ExamStatus`, `RemoteExam`, `RemoteExamDraft`, `ExamCatalog`, `RestExamCatalog`, `ExternalExamProperties`, `ExternalExamConfig`, `ExamMirror`.
+- Production updated: `Exam`, `ExamResponse`, `ExamRepository`, `GradeRepository`, `CourseRepository`, `ExamService`.
+- Tests added: `ExamMirrorTest`, `ExamCatalogFallbackTest`.
+
+### Functionalities affected
+
+- `POST /exams` creates the exam externally first, then stores the mirror.
+- `GET /exams`, `GET /exams/{id}`, and `GET /exams?courseId=` refresh the mirror, and fall back to it when the external service is down.
+- Legacy exams with no external id are never sent out.
+- Categories map to `MIDTERM`, `FINAL`, and `PROJECT`. Statuses map to `ACTIVE`, `CANCELLED`, or `UNKNOWN`.
+
+### Regression tests needed
+
+**3 new tests** (33 → **36 total**): category and status mapping, a graded mirror that keeps its date, and a read that falls back to the local mirror. `mvn test` does not need MySQL or a running external API.
+
+### Development and validation time
+
+About 2 hours, including a full `mvn test` run on JDK 17.
+
+### Unrelated functionality that broke
+
+Refreshing a mirrored exam would have changed the date and category that course grades and prerequisite checks already used. A graded mirror now freezes those fields.
+
 ## Model
 
 - User (id, name, role) is the parent of Student (email, program, optional phone number). Joined inheritance uses the tables `users` and `students`.
 - Course (code, title, capacity, required courses, equivalent courses, midterm weight 30, final weight 50, project weight 20).
 - Registration (student, course, status). A student can register for a course only once, and only when every prerequisite was passed in the previous academic year. A full course places the student on a FIFO waiting list.
 - WaitingListEntry (course, student, requestedAt). Position is computed, not stored.
-- Exam (course, date, type `MIDTERM`, `FINAL`, or `PROJECT`).
+- Exam (course, date, type `MIDTERM`, `FINAL`, or `PROJECT`, external id, status `ACTIVE`, `CANCELLED`, or `UNKNOWN`).
 - Grade (exam, student, value from 0 to 20, status `VALIDATED` or `PENDING_ADMIN_DECISION`, block reason). One grade per student and exam.
 - Session (course, date, label).
 - Attendance (session, student, status). One row per session and student.
@@ -259,9 +292,9 @@ Deleting a student failed once notifications referenced the student. `StudentSer
 | DELETE | /registrations/{id} | 204 / 404 |
 | GET | /registrations/waiting-list?courseId={id} | 200 / 404 |
 | DELETE | /registrations/waiting-list/{id} | 204 / 404 |
-| POST | /exams | 201 / 400 (optional type: MIDTERM, FINAL, PROJECT) |
-| GET | /exams, /exams/{id} | 200 / 404 |
-| GET | /exams?courseId={id} | 200 |
+| POST | /exams | 201 / 400 / 502 / 503 |
+| GET | /exams, /exams/{id} | 200 / 404 (local mirror if the external service is down) |
+| GET | /exams?courseId={id} | 200 (local mirror if the external service is down) |
 | POST | /grades | 201 / 400 / 409 |
 | POST | /sessions | 201 / 400 |
 | GET | /sessions, /sessions/{id} | 200 / 404 |
