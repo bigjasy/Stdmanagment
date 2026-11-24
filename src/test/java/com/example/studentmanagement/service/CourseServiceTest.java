@@ -2,10 +2,12 @@ package com.example.studentmanagement.service;
 
 import com.example.studentmanagement.domain.Course;
 import com.example.studentmanagement.domain.RegistrationStatus;
+import com.example.studentmanagement.persistence.AttendanceRepository;
 import com.example.studentmanagement.persistence.CourseRepository;
 import com.example.studentmanagement.persistence.ExamRepository;
 import com.example.studentmanagement.persistence.GradeRepository;
 import com.example.studentmanagement.persistence.RegistrationRepository;
+import com.example.studentmanagement.persistence.SessionRepository;
 import com.example.studentmanagement.shared.ApiException;
 import com.example.studentmanagement.support.TestIds;
 import com.example.studentmanagement.web.dto.CourseRequest;
@@ -35,6 +37,10 @@ class CourseServiceTest {
     private ExamRepository exams;
     @Mock
     private GradeRepository grades;
+    @Mock
+    private AttendanceRepository attendances;
+    @Mock
+    private SessionRepository sessions;
     @InjectMocks
     private CourseService service;
 

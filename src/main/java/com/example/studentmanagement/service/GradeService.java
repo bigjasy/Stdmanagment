@@ -1,7 +1,9 @@
 package com.example.studentmanagement.service;
 
 import com.example.studentmanagement.domain.Exam;
+import com.example.studentmanagement.domain.ExamType;
 import com.example.studentmanagement.domain.Grade;
+import com.example.studentmanagement.domain.GradeStatus;
 import com.example.studentmanagement.domain.Student;
 import com.example.studentmanagement.persistence.GradeRepository;
 import com.example.studentmanagement.shared.ApiException;
@@ -19,11 +21,14 @@ public class GradeService {
     private final GradeRepository grades;
     private final ExamService exams;
     private final StudentService students;
+    private final AbsenceRuleService absenceRules;
 
-    public GradeService(GradeRepository grades, ExamService exams, StudentService students) {
+    public GradeService(GradeRepository grades, ExamService exams, StudentService students,
+                        AbsenceRuleService absenceRules) {
         this.grades = grades;
         this.exams = exams;
         this.students = students;
+        this.absenceRules = absenceRules;
     }
 
     public GradeResponse create(GradeRequest request) {
@@ -33,7 +38,13 @@ public class GradeService {
             throw ApiException.conflict("Student " + student.getId()
                     + " already has a grade for exam " + exam.getId());
         }
-        Grade saved = grades.save(new Grade(exam, student, request.value()));
+        Grade grade = new Grade(exam, student, request.value());
+        absenceRules.courseBlock(student.getId(), exam.getCourse())
+                .or(() -> exam.getType() == ExamType.FINAL
+                        ? absenceRules.semesterBlock(student.getId())
+                        : java.util.Optional.empty())
+                .ifPresent(grade::holdForAdministration);
+        Grade saved = grades.save(grade);
         return GradeResponse.of(saved);
     }
 

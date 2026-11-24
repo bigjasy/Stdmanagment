@@ -1,6 +1,7 @@
 package com.example.studentmanagement.service;
 
 import com.example.studentmanagement.domain.Student;
+import com.example.studentmanagement.persistence.AttendanceRepository;
 import com.example.studentmanagement.persistence.GradeRepository;
 import com.example.studentmanagement.persistence.RegistrationRepository;
 import com.example.studentmanagement.persistence.StudentRepository;
@@ -31,6 +32,8 @@ class StudentServiceTest {
     private RegistrationRepository registrations;
     @Mock
     private GradeRepository grades;
+    @Mock
+    private AttendanceRepository attendances;
     @InjectMocks
     private StudentService service;
 
@@ -64,6 +67,7 @@ class StudentServiceTest {
 
         service.delete(4L);
 
+        verify(attendances).deleteByStudentId(4L);
         verify(grades).deleteByStudentId(4L);
         verify(registrations).deleteByStudentId(4L);
         verify(students).deleteById(4L);

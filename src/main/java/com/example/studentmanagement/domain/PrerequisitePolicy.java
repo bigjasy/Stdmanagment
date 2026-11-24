@@ -34,12 +34,8 @@ public final class PrerequisitePolicy {
         if (grades == null || grades.isEmpty()) {
             return Result.ABSENT;
         }
-        boolean passed = grades.stream().anyMatch(PrerequisitePolicy::countsAsPassed);
+        boolean passed = grades.stream().anyMatch(grade -> grade.countsAsPassed(PASS_MARK));
         return passed ? Result.PASSED : Result.FAILED;
-    }
-
-    static boolean countsAsPassed(Grade grade) {
-        return grade.getValue() != null && grade.getValue() >= PASS_MARK;
     }
 
     public enum Result {

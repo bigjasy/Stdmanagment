@@ -2,10 +2,12 @@ package com.example.studentmanagement.service;
 
 import com.example.studentmanagement.domain.Course;
 import com.example.studentmanagement.domain.RegistrationStatus;
+import com.example.studentmanagement.persistence.AttendanceRepository;
 import com.example.studentmanagement.persistence.CourseRepository;
 import com.example.studentmanagement.persistence.ExamRepository;
 import com.example.studentmanagement.persistence.GradeRepository;
 import com.example.studentmanagement.persistence.RegistrationRepository;
+import com.example.studentmanagement.persistence.SessionRepository;
 import com.example.studentmanagement.shared.ApiException;
 import com.example.studentmanagement.web.dto.CourseRequest;
 import com.example.studentmanagement.web.dto.CourseResponse;
@@ -23,15 +25,21 @@ public class CourseService {
     private final RegistrationRepository registrations;
     private final ExamRepository exams;
     private final GradeRepository grades;
+    private final AttendanceRepository attendances;
+    private final SessionRepository sessions;
 
     public CourseService(CourseRepository courses,
                          RegistrationRepository registrations,
                          ExamRepository exams,
-                         GradeRepository grades) {
+                         GradeRepository grades,
+                         AttendanceRepository attendances,
+                         SessionRepository sessions) {
         this.courses = courses;
         this.registrations = registrations;
         this.exams = exams;
         this.grades = grades;
+        this.attendances = attendances;
+        this.sessions = sessions;
     }
 
     public CourseResponse create(CourseRequest request) {
@@ -70,6 +78,8 @@ public class CourseService {
         for (Course owner : courses.findByEquivalentCourses_Id(id)) {
             owner.dropEquivalent(id);
         }
+        attendances.deleteBySessionCourseId(id);
+        sessions.deleteByCourseId(id);
         grades.deleteByExamCourseId(id);
         exams.deleteByCourseId(id);
         registrations.deleteByCourseId(id);

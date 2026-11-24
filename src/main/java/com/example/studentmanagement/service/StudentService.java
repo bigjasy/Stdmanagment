@@ -1,6 +1,7 @@
 package com.example.studentmanagement.service;
 
 import com.example.studentmanagement.domain.Student;
+import com.example.studentmanagement.persistence.AttendanceRepository;
 import com.example.studentmanagement.persistence.GradeRepository;
 import com.example.studentmanagement.persistence.RegistrationRepository;
 import com.example.studentmanagement.persistence.StudentRepository;
@@ -19,13 +20,16 @@ public class StudentService {
     private final StudentRepository students;
     private final RegistrationRepository registrations;
     private final GradeRepository grades;
+    private final AttendanceRepository attendances;
 
     public StudentService(StudentRepository students,
                           RegistrationRepository registrations,
-                          GradeRepository grades) {
+                          GradeRepository grades,
+                          AttendanceRepository attendances) {
         this.students = students;
         this.registrations = registrations;
         this.grades = grades;
+        this.attendances = attendances;
     }
 
     public StudentResponse create(StudentRequest request) {
@@ -53,6 +57,7 @@ public class StudentService {
 
     public void delete(Long id) {
         load(id);
+        attendances.deleteByStudentId(id);
         grades.deleteByStudentId(id);
         registrations.deleteByStudentId(id);
         students.deleteById(id);

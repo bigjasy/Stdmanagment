@@ -2,6 +2,8 @@ package com.example.studentmanagement.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -32,6 +34,13 @@ public class Grade {
     @Column(name = "grade_value", nullable = false)
     private Double value;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", length = 30)
+    private GradeStatus status;
+
+    @Column(name = "block_reason", length = 255)
+    private String blockReason;
+
     protected Grade() {
     }
 
@@ -39,6 +48,20 @@ public class Grade {
         this.exam = exam;
         this.student = student;
         this.value = value;
+        this.status = GradeStatus.VALIDATED;
+    }
+
+    public void holdForAdministration(String reason) {
+        this.status = GradeStatus.PENDING_ADMIN_DECISION;
+        this.blockReason = reason;
+    }
+
+    public GradeStatus status() {
+        return status == null ? GradeStatus.VALIDATED : status;
+    }
+
+    public boolean countsAsPassed(double passMark) {
+        return status() == GradeStatus.VALIDATED && value != null && value >= passMark;
     }
 
     public Long getId() {
@@ -55,5 +78,9 @@ public class Grade {
 
     public Double getValue() {
         return value;
+    }
+
+    public String getBlockReason() {
+        return blockReason;
     }
 }

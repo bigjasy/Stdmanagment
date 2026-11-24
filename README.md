@@ -22,7 +22,7 @@ Default XAMPP credentials are in `src/main/resources/application.properties`: us
 If an older schema is already in that database, drop it before the first run:
 
     SET FOREIGN_KEY_CHECKS = 0;
-    DROP TABLE IF EXISTS grades, exams, registrations, course_equivalents, course_prerequisites, students, users, courses;
+    DROP TABLE IF EXISTS attendances, sessions, grades, exams, registrations, course_equivalents, course_prerequisites, students, users, courses;
     SET FOREIGN_KEY_CHECKS = 1;
 
 ## Run
@@ -35,7 +35,7 @@ The API listens on http://localhost:8080.
 
     mvn test
 
-The suite does not need MySQL. This branch has **27 tests**.
+The suite does not need MySQL. This branch has **32 tests**.
 
 ## Git hooks
 
@@ -109,13 +109,54 @@ About 1 hour 20 minutes, including a full `mvn test` run on JDK 17.
 
 Adding the new exam type and weight columns as `NOT NULL` would stop Hibernate from updating a database that already has rows, which would take down every endpoint. The columns stay nullable, and `Exam.getType()` plus the course weight methods fall back to midterm and 30/50/20 when a legacy value is null.
 
+## Changes 3 — Attendance, absence blocking and administration decision
+
+Attendance is recorded per class session. A session belongs to a course, and each attendance row is unique for a session and a student. Status is `PRESENT`, `ABSENT_JUSTIFIED`, or `ABSENT_UNJUSTIFIED`.
+
+Two rules can hold a result for an administration decision:
+
+1. Three unjustified absences in the same course, during the current semester, block that course's exams.
+2. When 20% or more of the student's attendance records in the current semester are unjustified, the finals of every course are blocked. Midterms and projects stay validated.
+
+Fall is September through January. Spring is February through August. A blocked grade is stored with `PENDING_ADMIN_DECISION` and a reason, and the computed course grade has `finalGrade = null`. A teacher or an admin clears the block with `PUT /attendance/{id}/status`. A student role answers 403. A blocked grade counts as failed for Change 1 prerequisites.
+
+### How many classes were changed
+
+**31 Java classes** — 26 production and 5 test classes, plus this README:
+
+- Production added: `AttendanceStatus`, `GradeStatus`, `SemesterCalendar`, `AbsencePolicy`, `Session`, `Attendance`, `SessionRepository`, `AttendanceRepository`, `AbsenceRuleService`, `SessionService`, `AttendanceService`, `SessionRequest`, `SessionResponse`, `AttendanceRequest`, `AttendanceStatusRequest`, `AttendanceResponse`, `SessionController`, `AttendanceController`.
+- Production updated: `Grade`, `GradeResponse`, `CourseGradeResponse`, `PrerequisitePolicy`, `GradeService`, `CourseGradeService`, `StudentService`, `CourseService`.
+- Tests added: `SemesterCalendarTest`, `AbsencePolicyTest`.
+- Tests updated: `StudentServiceTest`, `CourseServiceTest`, `GradeServiceTest`.
+
+### Functionalities affected
+
+- New session and attendance endpoints, including duplicate rejection (409) and role-checked status changes.
+- Recording a grade stores the number, then marks it pending when a rule blocks it.
+- Course grade calculation keeps the averages and sets `finalGrade` to null while the student is blocked.
+- Deleting a student or a course removes attendance and session rows first.
+
+### Regression tests needed
+
+**5 new tests** (27 → **32 total**): fall and spring boundaries, the two absence thresholds, and a blocked grade that no longer counts as passed. `mvn test` does not need MySQL.
+
+### Development and validation time
+
+About 2 hours, including a full `mvn test` run on JDK 17.
+
+### Unrelated functionality that broke
+
+Deleting a course or a student failed once sessions and attendances added foreign keys. Both delete methods now remove those rows first. A blocked numeric grade of 10 or more would also have been treated as passed by the prerequisite rule; `Grade.countsAsPassed` ignores `PENDING_ADMIN_DECISION`.
+
 ## Model
 
 - User (id, name, role) is the parent of Student (email, program). Joined inheritance uses the tables `users` and `students`.
 - Course (code, title, capacity, required courses, equivalent courses, midterm weight 30, final weight 50, project weight 20).
 - Registration (student, course, status). A student can register for a course only once, and only when every prerequisite was passed in the previous academic year.
 - Exam (course, date, type `MIDTERM`, `FINAL`, or `PROJECT`).
-- Grade (exam, student, value from 0 to 20). One grade per student and exam. The course result is calculated from those grades.
+- Grade (exam, student, value from 0 to 20, status `VALIDATED` or `PENDING_ADMIN_DECISION`, block reason). One grade per student and exam.
+- Session (course, date, label).
+- Attendance (session, student, status). One row per session and student.
 
 ## Endpoints
 
@@ -144,6 +185,13 @@ Adding the new exam type and weight columns as `NOT NULL` would stop Hibernate f
 | GET | /exams, /exams/{id} | 200 / 404 |
 | GET | /exams?courseId={id} | 200 |
 | POST | /grades | 201 / 400 / 409 |
+| POST | /sessions | 201 / 400 |
+| GET | /sessions, /sessions/{id} | 200 / 404 |
+| GET | /sessions?courseId={id} | 200 |
+| POST | /attendance | 201 / 400 / 409 |
+| GET | /attendance, /attendance/{id} | 200 / 404 |
+| GET | /attendance?studentId={id} | 200 |
+| PUT | /attendance/{id}/status | 200 / 403 / 404 |
 
 ## Quick test
 

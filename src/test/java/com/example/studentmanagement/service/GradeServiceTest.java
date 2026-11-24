@@ -3,6 +3,7 @@ package com.example.studentmanagement.service;
 import com.example.studentmanagement.domain.Course;
 import com.example.studentmanagement.domain.Exam;
 import com.example.studentmanagement.domain.Student;
+import com.example.studentmanagement.service.AbsenceRuleService;
 import com.example.studentmanagement.persistence.GradeRepository;
 import com.example.studentmanagement.shared.ApiException;
 import com.example.studentmanagement.support.TestIds;
@@ -27,12 +28,14 @@ class GradeServiceTest {
     private ExamService exams;
     @Mock
     private StudentService students;
+    @Mock
+    private AbsenceRuleService absenceRules;
 
     private GradeService service;
 
     @BeforeEach
     void setUp() {
-        service = new GradeService(grades, exams, students);
+        service = new GradeService(grades, exams, students, absenceRules);
     }
 
     @Test
