@@ -20,6 +20,10 @@ import java.util.Set;
 @Table(name = "courses")
 public class Course {
 
+    public static final int DEFAULT_MIDTERM_WEIGHT = 30;
+    public static final int DEFAULT_FINAL_WEIGHT = 50;
+    public static final int DEFAULT_PROJECT_WEIGHT = 20;
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -36,6 +40,15 @@ public class Course {
     @Min(1)
     @Column(nullable = false)
     private Integer capacity;
+
+    @Column(name = "midterm_weight")
+    private Integer midtermWeight;
+
+    @Column(name = "final_weight")
+    private Integer finalWeight;
+
+    @Column(name = "project_weight")
+    private Integer projectWeight;
 
     @ManyToMany
     @JoinTable(name = "course_prerequisites",
@@ -56,6 +69,9 @@ public class Course {
         this.code = code.trim().toUpperCase();
         this.title = title.trim();
         this.capacity = capacity;
+        this.midtermWeight = DEFAULT_MIDTERM_WEIGHT;
+        this.finalWeight = DEFAULT_FINAL_WEIGHT;
+        this.projectWeight = DEFAULT_PROJECT_WEIGHT;
     }
 
     public void revise(String code, String title, int capacity) {
@@ -82,6 +98,24 @@ public class Course {
 
     public Integer getCapacity() {
         return capacity;
+    }
+
+    public int midtermWeight() {
+        return midtermWeight == null ? DEFAULT_MIDTERM_WEIGHT : midtermWeight;
+    }
+
+    public int finalWeight() {
+        return finalWeight == null ? DEFAULT_FINAL_WEIGHT : finalWeight;
+    }
+
+    public int projectWeight() {
+        return projectWeight == null ? DEFAULT_PROJECT_WEIGHT : projectWeight;
+    }
+
+    public void replaceWeights(int midterm, int finale, int project) {
+        this.midtermWeight = midterm;
+        this.finalWeight = finale;
+        this.projectWeight = project;
     }
 
     public void require(Course required) {

@@ -25,7 +25,7 @@ public class ExamService {
 
     public ExamResponse create(ExamRequest request) {
         Course course = findCourse(request.courseId());
-        Exam saved = exams.save(new Exam(course, request.date()));
+        Exam saved = exams.save(new Exam(course, request.date(), request.type()));
         return ExamResponse.of(saved);
     }
 

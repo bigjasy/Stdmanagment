@@ -18,4 +18,6 @@ public interface GradeRepository extends JpaRepository<Grade, Long> {
 
     List<Grade> findByStudentIdAndExamCourseIdAndExamDateBetween(
             Long studentId, Long courseId, LocalDate from, LocalDate to);
+
+    List<Grade> findByStudentIdAndExamCourseId(Long studentId, Long courseId);
 }

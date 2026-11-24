@@ -35,7 +35,7 @@ The API listens on http://localhost:8080.
 
     mvn test
 
-The suite does not need MySQL. This branch has **23 tests**.
+The suite does not need MySQL. This branch has **27 tests**.
 
 ## Git hooks
 
@@ -77,13 +77,45 @@ About 1 hour 30 minutes: design and implementation, then a full `mvn test` run o
 
 Deleting a course failed as soon as another course referenced it as a prerequisite or an equivalent. `CourseService.delete` now removes those links before the course row, and a regression test covers it.
 
+## Changes 2 — Weighted course grade
+
+A course grade is computed from exam grades. Each exam is `MIDTERM`, `FINAL`, or `PROJECT` (omitted type defaults to `MIDTERM`). Grades in one category are averaged, then the course weights are applied. The standard scheme is 30 / 50 / 20 and can be replaced per course when the three weights total 100. A category with no grade is ignored, and the result is divided by the weights that were actually used. Results are rounded to two decimals.
+
+### How many classes were changed
+
+**16 Java classes** — 14 production and 2 test classes, plus this README:
+
+- Production added: `ExamType`, `WeightedGradeCalculator`, `GradingWeightsRequest`, `CourseGradeResponse`, `CourseGradeService`.
+- Production updated: `Exam`, `ExamRequest`, `ExamResponse`, `Course`, `CourseResponse`, `ExamService`, `CourseService`, `CourseController`, `GradeRepository`.
+- Tests added: `WeightedGradeCalculatorTest`.
+- Tests updated: `CourseServiceTest`.
+
+### Functionalities affected
+
+- `POST /exams` accepts an optional `type`.
+- `PUT /courses/{id}/weights` replaces the 30/50/20 scheme. Any other total answers 400.
+- Course JSON now includes the three weights.
+- `GET /courses/{id}/grades/{studentId}` returns the averages, the weights, the applied weight, and the final grade.
+
+### Regression tests needed
+
+**4 new tests** (23 → **27 total**): the standard 30/50/20 combination, a missing category, legacy null weights, and a rejected weight total. `mvn test` does not need MySQL.
+
+### Development and validation time
+
+About 1 hour 20 minutes, including a full `mvn test` run on JDK 17.
+
+### Unrelated functionality that broke
+
+Adding the new exam type and weight columns as `NOT NULL` would stop Hibernate from updating a database that already has rows, which would take down every endpoint. The columns stay nullable, and `Exam.getType()` plus the course weight methods fall back to midterm and 30/50/20 when a legacy value is null.
+
 ## Model
 
 - User (id, name, role) is the parent of Student (email, program). Joined inheritance uses the tables `users` and `students`.
-- Course (code, title, capacity, required courses, equivalent courses).
+- Course (code, title, capacity, required courses, equivalent courses, midterm weight 30, final weight 50, project weight 20).
 - Registration (student, course, status). A student can register for a course only once, and only when every prerequisite was passed in the previous academic year.
-- Exam (course, date).
-- Grade (exam, student, value from 0 to 20). One grade per student and exam.
+- Exam (course, date, type `MIDTERM`, `FINAL`, or `PROJECT`).
+- Grade (exam, student, value from 0 to 20). One grade per student and exam. The course result is calculated from those grades.
 
 ## Endpoints
 
@@ -105,8 +137,10 @@ Deleting a course failed as soon as another course referenced it as a prerequisi
 | GET | /courses/{id}/equivalents | 200 / 404 |
 | POST | /courses/{id}/equivalents | 201 / 400 / 404 / 409 |
 | DELETE | /courses/{id}/equivalents/{equivalentCourseId} | 200 / 400 / 404 |
+| PUT | /courses/{id}/weights | 200 / 400 / 404 |
+| GET | /courses/{id}/grades/{studentId} | 200 / 404 |
 | POST | /registrations | 201 / 400 (unknown student, unknown course, prerequisites, or course full) / 409 |
-| POST | /exams | 201 / 400 |
+| POST | /exams | 201 / 400 (optional type: MIDTERM, FINAL, PROJECT) |
 | GET | /exams, /exams/{id} | 200 / 404 |
 | GET | /exams?courseId={id} | 200 |
 | POST | /grades | 201 / 400 / 409 |

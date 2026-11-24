@@ -1,9 +1,12 @@
 package com.example.studentmanagement.web;
 
+import com.example.studentmanagement.service.CourseGradeService;
 import com.example.studentmanagement.service.CourseService;
+import com.example.studentmanagement.web.dto.CourseGradeResponse;
 import com.example.studentmanagement.web.dto.CourseRequest;
 import com.example.studentmanagement.web.dto.CourseResponse;
 import com.example.studentmanagement.web.dto.EquivalentCourseRequest;
+import com.example.studentmanagement.web.dto.GradingWeightsRequest;
 import com.example.studentmanagement.web.dto.PrerequisiteRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -24,9 +27,11 @@ import java.util.List;
 public class CourseController {
 
     private final CourseService courses;
+    private final CourseGradeService courseGrades;
 
-    public CourseController(CourseService courses) {
+    public CourseController(CourseService courses, CourseGradeService courseGrades) {
         this.courses = courses;
+        this.courseGrades = courseGrades;
     }
 
     @PostMapping
@@ -86,5 +91,15 @@ public class CourseController {
     @DeleteMapping("/{id}/equivalents/{equivalentCourseId}")
     public CourseResponse removeEquivalent(@PathVariable Long id, @PathVariable Long equivalentCourseId) {
         return courses.removeEquivalent(id, equivalentCourseId);
+    }
+
+    @PutMapping("/{id}/weights")
+    public CourseResponse updateWeights(@PathVariable Long id, @Valid @RequestBody GradingWeightsRequest request) {
+        return courses.updateWeights(id, request);
+    }
+
+    @GetMapping("/{id}/grades/{studentId}")
+    public CourseGradeResponse grade(@PathVariable Long id, @PathVariable Long studentId) {
+        return courseGrades.calculate(id, studentId);
     }
 }

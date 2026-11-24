@@ -94,4 +94,11 @@ class CourseServiceTest {
 
         assertThat(owner.requiredCourses()).isEmpty();
     }
+
+    @Test
+    void updateWeightsRejectsATotalOtherThanOneHundred() {
+        assertThatThrownBy(() -> service.updateWeights(1L, new com.example.studentmanagement.web.dto.GradingWeightsRequest(40, 40, 10)))
+                .isInstanceOf(ApiException.class)
+                .hasMessage("Exam weights must total 100");
+    }
 }

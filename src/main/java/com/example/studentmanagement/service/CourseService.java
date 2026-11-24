@@ -9,6 +9,7 @@ import com.example.studentmanagement.persistence.RegistrationRepository;
 import com.example.studentmanagement.shared.ApiException;
 import com.example.studentmanagement.web.dto.CourseRequest;
 import com.example.studentmanagement.web.dto.CourseResponse;
+import com.example.studentmanagement.web.dto.GradingWeightsRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -126,6 +127,16 @@ public class CourseService {
         if (!course.dropEquivalent(equivalentCourseId)) {
             throw ApiException.badRequest(equivalent.getCode() + " is not an equivalent of " + course.getCode());
         }
+        return CourseResponse.of(course);
+    }
+
+    public CourseResponse updateWeights(Long id, GradingWeightsRequest request) {
+        int total = request.midtermWeight() + request.finalWeight() + request.projectWeight();
+        if (total != 100) {
+            throw ApiException.badRequest("Exam weights must total 100");
+        }
+        Course course = load(id);
+        course.replaceWeights(request.midtermWeight(), request.finalWeight(), request.projectWeight());
         return CourseResponse.of(course);
     }
 
