@@ -41,6 +41,8 @@ class CourseServiceTest {
     private AttendanceRepository attendances;
     @Mock
     private SessionRepository sessions;
+    @Mock
+    private com.example.studentmanagement.persistence.WaitingListRepository waitingList;
     @InjectMocks
     private CourseService service;
 

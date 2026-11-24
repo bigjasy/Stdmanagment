@@ -8,6 +8,7 @@ import com.example.studentmanagement.persistence.ExamRepository;
 import com.example.studentmanagement.persistence.GradeRepository;
 import com.example.studentmanagement.persistence.RegistrationRepository;
 import com.example.studentmanagement.persistence.SessionRepository;
+import com.example.studentmanagement.persistence.WaitingListRepository;
 import com.example.studentmanagement.shared.ApiException;
 import com.example.studentmanagement.web.dto.CourseRequest;
 import com.example.studentmanagement.web.dto.CourseResponse;
@@ -27,19 +28,22 @@ public class CourseService {
     private final GradeRepository grades;
     private final AttendanceRepository attendances;
     private final SessionRepository sessions;
+    private final WaitingListRepository waitingList;
 
     public CourseService(CourseRepository courses,
                          RegistrationRepository registrations,
                          ExamRepository exams,
                          GradeRepository grades,
                          AttendanceRepository attendances,
-                         SessionRepository sessions) {
+                         SessionRepository sessions,
+                         WaitingListRepository waitingList) {
         this.courses = courses;
         this.registrations = registrations;
         this.exams = exams;
         this.grades = grades;
         this.attendances = attendances;
         this.sessions = sessions;
+        this.waitingList = waitingList;
     }
 
     public CourseResponse create(CourseRequest request) {
@@ -80,6 +84,7 @@ public class CourseService {
         }
         attendances.deleteBySessionCourseId(id);
         sessions.deleteByCourseId(id);
+        waitingList.deleteByCourseId(id);
         grades.deleteByExamCourseId(id);
         exams.deleteByCourseId(id);
         registrations.deleteByCourseId(id);
@@ -152,6 +157,11 @@ public class CourseService {
 
     public Course load(Long id) {
         return courses.findById(id)
+                .orElseThrow(() -> ApiException.notFound("Course " + id + " was not found"));
+    }
+
+    public Course loadForUpdate(Long id) {
+        return courses.findByIdForUpdate(id)
                 .orElseThrow(() -> ApiException.notFound("Course " + id + " was not found"));
     }
 

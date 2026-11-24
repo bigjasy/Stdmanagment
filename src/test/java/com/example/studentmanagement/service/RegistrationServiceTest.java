@@ -7,6 +7,7 @@ import com.example.studentmanagement.domain.RegistrationStatus;
 import com.example.studentmanagement.domain.Student;
 import com.example.studentmanagement.persistence.GradeRepository;
 import com.example.studentmanagement.persistence.RegistrationRepository;
+import com.example.studentmanagement.persistence.WaitingListRepository;
 import com.example.studentmanagement.shared.ApiException;
 import com.example.studentmanagement.support.TestIds;
 import com.example.studentmanagement.web.dto.RegistrationRequest;
@@ -35,6 +36,8 @@ class RegistrationServiceTest {
     @Mock
     private GradeRepository grades;
     @Mock
+    private WaitingListRepository waitingList;
+    @Mock
     private StudentService students;
     @Mock
     private CourseService courses;
@@ -46,7 +49,7 @@ class RegistrationServiceTest {
     @BeforeEach
     void setUp() {
         Clock clock = Clock.fixed(LocalDate.of(2026, 11, 24).atStartOfDay().toInstant(ZoneOffset.UTC), ZoneOffset.UTC);
-        service = new RegistrationService(registrations, grades, students, courses, clock);
+        service = new RegistrationService(registrations, grades, waitingList, students, courses, clock);
         student = TestIds.withId(new Student("Ada", "ada@school.test", "CS"), 1L);
         course = TestIds.withId(new Course("CS101", "Algorithms", 1), 2L);
     }
@@ -54,12 +57,12 @@ class RegistrationServiceTest {
     @Test
     void createValidatesARegistrationWhenASeatIsFree() {
         when(students.load(1L)).thenReturn(student);
-        when(courses.load(2L)).thenReturn(course);
+        when(courses.loadForUpdate(2L)).thenReturn(course);
         when(registrations.existsByStudentIdAndCourseId(1L, 2L)).thenReturn(false);
         when(registrations.countByCourseIdAndStatus(2L, RegistrationStatus.VALIDATED)).thenReturn(0L);
         when(registrations.save(any())).thenAnswer(invocation -> TestIds.withId(invocation.getArgument(0), 8L));
 
-        RegistrationResponse response = service.create(new RegistrationRequest(1L, 2L));
+        RegistrationResponse response = service.create(new RegistrationRequest(1L, 2L)).registration();
 
         assertThat(response.id()).isEqualTo(8L);
         assertThat(response.status()).isEqualTo(RegistrationStatus.VALIDATED);
@@ -67,21 +70,27 @@ class RegistrationServiceTest {
     }
 
     @Test
-    void createRejectsAFullCourse() {
+    void createPutsAStudentOnTheWaitingListWhenTheCourseIsFull() {
         when(students.load(1L)).thenReturn(student);
-        when(courses.load(2L)).thenReturn(course);
+        when(courses.loadForUpdate(2L)).thenReturn(course);
         when(registrations.existsByStudentIdAndCourseId(1L, 2L)).thenReturn(false);
+        when(waitingList.existsByStudentIdAndCourseId(1L, 2L)).thenReturn(false);
         when(registrations.countByCourseIdAndStatus(2L, RegistrationStatus.VALIDATED)).thenReturn(1L);
+        when(waitingList.save(any())).thenAnswer(invocation -> TestIds.withId(invocation.getArgument(0), 9L));
+        when(waitingList.findByCourseIdOrderByIdAsc(2L)).thenReturn(List.of(
+                TestIds.withId(new com.example.studentmanagement.domain.WaitingListEntry(
+                        course, student, LocalDate.of(2026, 11, 24).atStartOfDay()), 9L)));
 
-        assertThatThrownBy(() -> service.create(new RegistrationRequest(1L, 2L)))
-                .isInstanceOf(ApiException.class)
-                .hasMessage("Course CS101 is full");
+        var enrollment = service.create(new RegistrationRequest(1L, 2L));
+
+        assertThat(enrollment.isWaiting()).isTrue();
+        assertThat(enrollment.waiting().position()).isEqualTo(1);
     }
 
     @Test
     void createRejectsADuplicateRegistration() {
         when(students.load(1L)).thenReturn(student);
-        when(courses.load(2L)).thenReturn(course);
+        when(courses.loadForUpdate(2L)).thenReturn(course);
         when(registrations.existsByStudentIdAndCourseId(1L, 2L)).thenReturn(true);
 
         assertThatThrownBy(() -> service.create(new RegistrationRequest(1L, 2L)))
@@ -105,7 +114,7 @@ class RegistrationServiceTest {
         course.require(required);
         Exam exam = TestIds.withId(new Exam(required, LocalDate.of(2025, 12, 1)), 7L);
         when(students.load(1L)).thenReturn(student);
-        when(courses.load(2L)).thenReturn(course);
+        when(courses.loadForUpdate(2L)).thenReturn(course);
         when(grades.findByStudentIdAndExamCourseIdAndExamDateBetween(
                 1L, 5L, LocalDate.of(2025, 9, 1), LocalDate.of(2026, 8, 31)))
                 .thenReturn(List.of(new Grade(exam, student, 8.0)));
@@ -123,7 +132,7 @@ class RegistrationServiceTest {
         course.require(required);
         Exam exam = TestIds.withId(new Exam(equivalent, LocalDate.of(2026, 1, 15)), 7L);
         when(students.load(1L)).thenReturn(student);
-        when(courses.load(2L)).thenReturn(course);
+        when(courses.loadForUpdate(2L)).thenReturn(course);
         when(registrations.existsByStudentIdAndCourseId(1L, 2L)).thenReturn(false);
         when(registrations.countByCourseIdAndStatus(2L, RegistrationStatus.VALIDATED)).thenReturn(0L);
         when(registrations.save(any())).thenAnswer(invocation -> TestIds.withId(invocation.getArgument(0), 8L));
@@ -134,7 +143,7 @@ class RegistrationServiceTest {
                 1L, 6L, LocalDate.of(2025, 9, 1), LocalDate.of(2026, 8, 31)))
                 .thenReturn(List.of(new Grade(exam, student, 14.0)));
 
-        RegistrationResponse response = service.create(new RegistrationRequest(1L, 2L));
+        RegistrationResponse response = service.create(new RegistrationRequest(1L, 2L)).registration();
 
         assertThat(response.status()).isEqualTo(RegistrationStatus.VALIDATED);
     }

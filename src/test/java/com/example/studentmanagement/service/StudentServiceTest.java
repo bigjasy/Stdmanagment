@@ -34,6 +34,8 @@ class StudentServiceTest {
     private GradeRepository grades;
     @Mock
     private AttendanceRepository attendances;
+    @Mock
+    private com.example.studentmanagement.persistence.WaitingListRepository waitingList;
     @InjectMocks
     private StudentService service;
 

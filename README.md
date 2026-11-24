@@ -22,7 +22,7 @@ Default XAMPP credentials are in `src/main/resources/application.properties`: us
 If an older schema is already in that database, drop it before the first run:
 
     SET FOREIGN_KEY_CHECKS = 0;
-    DROP TABLE IF EXISTS attendances, sessions, grades, exams, registrations, course_equivalents, course_prerequisites, students, users, courses;
+    DROP TABLE IF EXISTS attendances, sessions, grades, exams, waiting_list, registrations, course_equivalents, course_prerequisites, students, users, courses;
     SET FOREIGN_KEY_CHECKS = 1;
 
 ## Run
@@ -148,11 +148,46 @@ About 2 hours, including a full `mvn test` run on JDK 17.
 
 Deleting a course or a student failed once sessions and attendances added foreign keys. Both delete methods now remove those rows first. A blocked numeric grade of 10 or more would also have been treated as passed by the prerequisite rule; `Grade.countsAsPassed` ignores `PENDING_ADMIN_DECISION`.
 
+## Changes 4 — Waiting list and automatic promotion on cancellation
+
+A full course no longer rejects the student. `POST /registrations` answers **201** with the registration when a seat is free, and **202** with a waiting-list entry when it is not. Capacity still counts only `VALIDATED` registrations. Create, cancel, and leaving the list lock the course row so two requests cannot take the last seat.
+
+Cancelling a registration promotes the oldest waiting student who is still eligible. A student who is already registered, or who no longer satisfies the prerequisites, stays on the list and the next student is tried. Positions are computed from insertion order.
+
+### How many classes were changed
+
+**12 Java classes** — 9 production and 3 test classes, plus this README:
+
+- Production added: `WaitingListEntry`, `WaitingListRepository`, `WaitingListResponse`, `Enrollment`.
+- Production updated: `CourseRepository`, `CourseService`, `StudentService`, `RegistrationService`, `RegistrationController`.
+- Tests updated: `RegistrationServiceTest`, `StudentServiceTest`, `CourseServiceTest`.
+
+### Functionalities affected
+
+- Registration creation returns a seat or a FIFO waiting-list place. A duplicate registration or a duplicate waiting-list entry answers 409.
+- `DELETE /registrations/{id}` cancels a registration and promotes the first eligible waiting student.
+- `GET /registrations/waiting-list?courseId=` lists entries with a computed position.
+- `DELETE /registrations/waiting-list/{id}` lets a student leave the list.
+- Deleting a course or a student removes waiting-list rows first.
+
+### Regression tests needed
+
+The full-course rejection test was replaced by a waiting-list test. The suite stays at **32 tests** and does not need MySQL. Existing delete tests still run against the cleanup path.
+
+### Development and validation time
+
+About 1 hour 30 minutes, including a full `mvn test` run on JDK 17.
+
+### Unrelated functionality that broke
+
+Deleting a course or a student failed once `waiting_list` added foreign keys. Both delete methods now remove those rows before the parent row.
+
 ## Model
 
 - User (id, name, role) is the parent of Student (email, program). Joined inheritance uses the tables `users` and `students`.
 - Course (code, title, capacity, required courses, equivalent courses, midterm weight 30, final weight 50, project weight 20).
-- Registration (student, course, status). A student can register for a course only once, and only when every prerequisite was passed in the previous academic year.
+- Registration (student, course, status). A student can register for a course only once, and only when every prerequisite was passed in the previous academic year. A full course places the student on a FIFO waiting list.
+- WaitingListEntry (course, student, requestedAt). Position is computed, not stored.
 - Exam (course, date, type `MIDTERM`, `FINAL`, or `PROJECT`).
 - Grade (exam, student, value from 0 to 20, status `VALIDATED` or `PENDING_ADMIN_DECISION`, block reason). One grade per student and exam.
 - Session (course, date, label).
@@ -180,7 +215,10 @@ Deleting a course or a student failed once sessions and attendances added foreig
 | DELETE | /courses/{id}/equivalents/{equivalentCourseId} | 200 / 400 / 404 |
 | PUT | /courses/{id}/weights | 200 / 400 / 404 |
 | GET | /courses/{id}/grades/{studentId} | 200 / 404 |
-| POST | /registrations | 201 / 400 (unknown student, unknown course, prerequisites, or course full) / 409 |
+| POST | /registrations | 201 (registered) / 202 (waiting list) / 400 / 409 |
+| DELETE | /registrations/{id} | 204 / 404 |
+| GET | /registrations/waiting-list?courseId={id} | 200 / 404 |
+| DELETE | /registrations/waiting-list/{id} | 204 / 404 |
 | POST | /exams | 201 / 400 (optional type: MIDTERM, FINAL, PROJECT) |
 | GET | /exams, /exams/{id} | 200 / 404 |
 | GET | /exams?courseId={id} | 200 |

@@ -5,6 +5,7 @@ import com.example.studentmanagement.persistence.AttendanceRepository;
 import com.example.studentmanagement.persistence.GradeRepository;
 import com.example.studentmanagement.persistence.RegistrationRepository;
 import com.example.studentmanagement.persistence.StudentRepository;
+import com.example.studentmanagement.persistence.WaitingListRepository;
 import com.example.studentmanagement.shared.ApiException;
 import com.example.studentmanagement.web.dto.StudentRequest;
 import com.example.studentmanagement.web.dto.StudentResponse;
@@ -21,15 +22,18 @@ public class StudentService {
     private final RegistrationRepository registrations;
     private final GradeRepository grades;
     private final AttendanceRepository attendances;
+    private final WaitingListRepository waitingList;
 
     public StudentService(StudentRepository students,
                           RegistrationRepository registrations,
                           GradeRepository grades,
-                          AttendanceRepository attendances) {
+                          AttendanceRepository attendances,
+                          WaitingListRepository waitingList) {
         this.students = students;
         this.registrations = registrations;
         this.grades = grades;
         this.attendances = attendances;
+        this.waitingList = waitingList;
     }
 
     public StudentResponse create(StudentRequest request) {
@@ -58,6 +62,7 @@ public class StudentService {
     public void delete(Long id) {
         load(id);
         attendances.deleteByStudentId(id);
+        waitingList.deleteByStudentId(id);
         grades.deleteByStudentId(id);
         registrations.deleteByStudentId(id);
         students.deleteById(id);
