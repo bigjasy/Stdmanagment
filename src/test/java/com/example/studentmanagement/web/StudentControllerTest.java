@@ -2,6 +2,7 @@ package com.example.studentmanagement.web;
 
 import com.example.studentmanagement.domain.Role;
 import com.example.studentmanagement.service.GradeService;
+import com.example.studentmanagement.service.NotificationService;
 import com.example.studentmanagement.service.RegistrationService;
 import com.example.studentmanagement.service.StudentService;
 import com.example.studentmanagement.shared.ApiErrorHandler;
@@ -31,6 +32,8 @@ class StudentControllerTest {
     private RegistrationService registrations;
     @Mock
     private GradeService grades;
+    @Mock
+    private NotificationService notifications;
 
     private MockMvc mvc;
 
@@ -38,7 +41,7 @@ class StudentControllerTest {
     void setUp() {
         LocalValidatorFactoryBean validator = new LocalValidatorFactoryBean();
         validator.afterPropertiesSet();
-        mvc = MockMvcBuilders.standaloneSetup(new StudentController(students, registrations, grades))
+        mvc = MockMvcBuilders.standaloneSetup(new StudentController(students, registrations, grades, notifications))
                 .setControllerAdvice(new ApiErrorHandler())
                 .setValidator(validator)
                 .build();
@@ -47,7 +50,7 @@ class StudentControllerTest {
     @Test
     void createReturns201() throws Exception {
         when(students.create(any())).thenReturn(
-                new StudentResponse(1L, "Ada Lovelace", Role.STUDENT, "ada@school.test", "CS"));
+                new StudentResponse(1L, "Ada Lovelace", Role.STUDENT, "ada@school.test", "CS", null));
 
         mvc.perform(post("/students")
                         .contentType(MediaType.APPLICATION_JSON)

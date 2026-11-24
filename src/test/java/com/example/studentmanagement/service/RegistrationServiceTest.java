@@ -41,6 +41,8 @@ class RegistrationServiceTest {
     private StudentService students;
     @Mock
     private CourseService courses;
+    @Mock
+    private NotificationService notifications;
 
     private RegistrationService service;
     private Student student;
@@ -49,7 +51,7 @@ class RegistrationServiceTest {
     @BeforeEach
     void setUp() {
         Clock clock = Clock.fixed(LocalDate.of(2026, 11, 24).atStartOfDay().toInstant(ZoneOffset.UTC), ZoneOffset.UTC);
-        service = new RegistrationService(registrations, grades, waitingList, students, courses, clock);
+        service = new RegistrationService(registrations, grades, waitingList, students, courses, clock, notifications);
         student = TestIds.withId(new Student("Ada", "ada@school.test", "CS"), 1L);
         course = TestIds.withId(new Course("CS101", "Algorithms", 1), 2L);
     }

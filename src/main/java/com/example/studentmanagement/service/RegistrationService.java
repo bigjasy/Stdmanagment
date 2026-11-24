@@ -33,19 +33,22 @@ public class RegistrationService {
     private final StudentService students;
     private final CourseService courses;
     private final Clock clock;
+    private final NotificationService notifications;
 
     public RegistrationService(RegistrationRepository registrations,
                                GradeRepository grades,
                                WaitingListRepository waitingList,
                                StudentService students,
                                CourseService courses,
-                               Clock clock) {
+                               Clock clock,
+                               NotificationService notifications) {
         this.registrations = registrations;
         this.grades = grades;
         this.waitingList = waitingList;
         this.students = students;
         this.courses = courses;
         this.clock = clock;
+        this.notifications = notifications;
     }
 
     public Enrollment create(RegistrationRequest request) {
@@ -60,7 +63,7 @@ public class RegistrationService {
             int position = waitingList.findByCourseIdOrderByIdAsc(course.getId()).size();
             return Enrollment.waiting(WaitingListResponse.of(saved, position));
         }
-        Registration saved = registrations.save(Registration.validated(student, course));
+        Registration saved = register(student, course);
         return Enrollment.registered(RegistrationResponse.of(saved));
     }
 
@@ -137,10 +140,16 @@ public class RegistrationService {
             if (!PrerequisitePolicy.unsatisfied(course, history(student)).isEmpty()) {
                 continue;
             }
-            registrations.save(Registration.validated(student, course));
+            register(student, course);
             waitingList.delete(entry);
             return;
         }
+    }
+
+    private Registration register(Student student, Course course) {
+        Registration saved = registrations.save(Registration.validated(student, course));
+        notifications.registrationAccepted(student, course, saved.getId());
+        return saved;
     }
 
     private PrerequisitePolicy.GradeHistory history(Student student) {

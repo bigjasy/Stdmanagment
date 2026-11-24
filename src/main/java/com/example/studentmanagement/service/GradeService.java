@@ -22,13 +22,15 @@ public class GradeService {
     private final ExamService exams;
     private final StudentService students;
     private final AbsenceRuleService absenceRules;
+    private final NotificationService notifications;
 
     public GradeService(GradeRepository grades, ExamService exams, StudentService students,
-                        AbsenceRuleService absenceRules) {
+                        AbsenceRuleService absenceRules, NotificationService notifications) {
         this.grades = grades;
         this.exams = exams;
         this.students = students;
         this.absenceRules = absenceRules;
+        this.notifications = notifications;
     }
 
     public GradeResponse create(GradeRequest request) {
@@ -45,6 +47,7 @@ public class GradeService {
                         : java.util.Optional.empty())
                 .ifPresent(grade::holdForAdministration);
         Grade saved = grades.save(grade);
+        notifications.gradePosted(student, exam, saved);
         return GradeResponse.of(saved);
     }
 

@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -35,6 +36,11 @@ public class SessionController {
     @GetMapping
     public List<SessionResponse> findAll(@RequestParam(required = false) Long courseId) {
         return sessions.findAll(courseId);
+    }
+
+    @PutMapping("/{id}")
+    public SessionResponse update(@PathVariable Long id, @Valid @RequestBody SessionRequest request) {
+        return sessions.update(id, request);
     }
 
     @GetMapping("/{id}")

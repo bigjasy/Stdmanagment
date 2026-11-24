@@ -17,16 +17,29 @@ public class SessionService {
 
     private final SessionRepository sessions;
     private final CourseService courses;
+    private final NotificationService notifications;
 
-    public SessionService(SessionRepository sessions, CourseService courses) {
+    public SessionService(SessionRepository sessions, CourseService courses, NotificationService notifications) {
         this.sessions = sessions;
         this.courses = courses;
+        this.notifications = notifications;
     }
 
     public SessionResponse create(SessionRequest request) {
         Course course = findCourse(request.courseId());
         Session saved = sessions.save(new Session(course, request.date(), request.label()));
+        notifications.timetableChanged(saved);
         return SessionResponse.of(saved);
+    }
+
+    public SessionResponse update(Long id, SessionRequest request) {
+        Session session = load(id);
+        if (!session.getCourse().getId().equals(request.courseId())) {
+            throw ApiException.badRequest("The course of an existing session cannot be changed");
+        }
+        session.reschedule(request.date(), request.label());
+        notifications.timetableChanged(session);
+        return SessionResponse.of(session);
     }
 
     @Transactional(readOnly = true)

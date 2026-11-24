@@ -1,9 +1,13 @@
 package com.example.studentmanagement.web;
 
 import com.example.studentmanagement.service.GradeService;
+import com.example.studentmanagement.service.NotificationService;
 import com.example.studentmanagement.service.RegistrationService;
 import com.example.studentmanagement.service.StudentService;
 import com.example.studentmanagement.web.dto.GradeResponse;
+import com.example.studentmanagement.web.dto.NotificationPreferenceRequest;
+import com.example.studentmanagement.web.dto.NotificationPreferenceResponse;
+import com.example.studentmanagement.web.dto.NotificationResponse;
 import com.example.studentmanagement.web.dto.RegistrationResponse;
 import com.example.studentmanagement.web.dto.StudentRequest;
 import com.example.studentmanagement.web.dto.StudentResponse;
@@ -28,13 +32,16 @@ public class StudentController {
     private final StudentService students;
     private final RegistrationService registrations;
     private final GradeService grades;
+    private final NotificationService notifications;
 
     public StudentController(StudentService students,
                              RegistrationService registrations,
-                             GradeService grades) {
+                             GradeService grades,
+                             NotificationService notifications) {
         this.students = students;
         this.registrations = registrations;
         this.grades = grades;
+        this.notifications = notifications;
     }
 
     @PostMapping
@@ -72,5 +79,21 @@ public class StudentController {
     @GetMapping("/{id}/grades")
     public List<GradeResponse> grades(@PathVariable Long id) {
         return grades.findByStudent(id);
+    }
+
+    @GetMapping("/{id}/notification-preferences")
+    public NotificationPreferenceResponse preferences(@PathVariable Long id) {
+        return notifications.preference(id);
+    }
+
+    @PutMapping("/{id}/notification-preferences")
+    public NotificationPreferenceResponse replacePreferences(@PathVariable Long id,
+                                                             @RequestBody NotificationPreferenceRequest request) {
+        return notifications.replacePreference(id, request);
+    }
+
+    @GetMapping("/{id}/notifications")
+    public List<NotificationResponse> notifications(@PathVariable Long id) {
+        return notifications.history(id);
     }
 }

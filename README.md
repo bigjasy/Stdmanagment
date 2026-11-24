@@ -22,7 +22,7 @@ Default XAMPP credentials are in `src/main/resources/application.properties`: us
 If an older schema is already in that database, drop it before the first run:
 
     SET FOREIGN_KEY_CHECKS = 0;
-    DROP TABLE IF EXISTS attendances, sessions, grades, exams, waiting_list, registrations, course_equivalents, course_prerequisites, students, users, courses;
+    DROP TABLE IF EXISTS notifications, notification_preferences, attendances, sessions, grades, exams, waiting_list, registrations, course_equivalents, course_prerequisites, students, users, courses;
     SET FOREIGN_KEY_CHECKS = 1;
 
 ## Run
@@ -35,7 +35,7 @@ The API listens on http://localhost:8080.
 
     mvn test
 
-The suite does not need MySQL. This branch has **32 tests**.
+The suite does not need MySQL. This branch has **33 tests**.
 
 ## Git hooks
 
@@ -182,9 +182,44 @@ About 1 hour 30 minutes, including a full `mvn test` run on JDK 17.
 
 Deleting a course or a student failed once `waiting_list` added foreign keys. Both delete methods now remove those rows before the parent row.
 
+## Changes 5 — Multi-channel notifications with preferences
+
+Students can be notified by email, SMS, or WhatsApp. `NotificationService` is the only place that sends. It reads the student's channel preferences, asks a `ChannelSender` to deliver, and stores every attempt as `SENT` or `FAILED`. A missing phone number or a sender error is recorded and does not fail the registration, grade, or session request. Email is the default when the student has no preference row.
+
+Notifications go out when a registration is accepted (including a waiting-list promotion), when a session is created or moved, and when a grade is posted. A blocked grade says that an administration decision is pending.
+
+### How many classes were changed
+
+**20 Java classes** — 16 production and 4 test classes, plus this README:
+
+- Production added: `NotificationChannel`, `NotificationType`, `NotificationStatus`, `NotificationPreference`, `Notification`, `ChannelSender`, `LoggingChannelSender`, `NotificationRepository`, `NotificationPreferenceRepository`, `NotificationService`, `NotificationPreferenceRequest`, `NotificationPreferenceResponse`, `NotificationResponse`.
+- Production updated: `Student`, `StudentRequest`, `StudentResponse`, `StudentService`, `RegistrationService`, `RegistrationRepository`, `SessionService`, `SessionController`, `GradeService`, `StudentController`.
+- Tests added: `LoggingChannelSenderTest`.
+- Tests updated: `StudentServiceTest`, `RegistrationServiceTest`, `GradeServiceTest`, `StudentControllerTest`.
+
+### Functionalities affected
+
+- `GET` and `PUT /students/{id}/notification-preferences` choose any mix of EMAIL, SMS, and WHATSAPP.
+- `Student` gained an optional `phoneNumber`, used by SMS and WhatsApp.
+- `PUT /sessions/{id}` changes the date and label, refuses a course change, and notifies validated students.
+- `GET /students/{id}/notifications` returns attempts, newest first.
+- Deleting a student also deletes notification rows and preferences.
+
+### Regression tests needed
+
+**1 new test** (32 → **33 total**) checks that a blank SMS destination fails that channel. The existing registration, grade, and student tests still pass with the new collaborators. `mvn test` does not need MySQL.
+
+### Development and validation time
+
+About 2 hours, including a full `mvn test` run on JDK 17.
+
+### Unrelated functionality that broke
+
+Deleting a student failed once notifications referenced the student. `StudentService.delete` now removes notification and preference rows first.
+
 ## Model
 
-- User (id, name, role) is the parent of Student (email, program). Joined inheritance uses the tables `users` and `students`.
+- User (id, name, role) is the parent of Student (email, program, optional phone number). Joined inheritance uses the tables `users` and `students`.
 - Course (code, title, capacity, required courses, equivalent courses, midterm weight 30, final weight 50, project weight 20).
 - Registration (student, course, status). A student can register for a course only once, and only when every prerequisite was passed in the previous academic year. A full course places the student on a FIFO waiting list.
 - WaitingListEntry (course, student, requestedAt). Position is computed, not stored.
@@ -192,6 +227,8 @@ Deleting a course or a student failed once `waiting_list` added foreign keys. Bo
 - Grade (exam, student, value from 0 to 20, status `VALIDATED` or `PENDING_ADMIN_DECISION`, block reason). One grade per student and exam.
 - Session (course, date, label).
 - Attendance (session, student, status). One row per session and student.
+- NotificationPreference (student, email enabled by default, SMS, WhatsApp).
+- Notification (student, type, channel, status, message, recipient, reference, failure reason, created at).
 
 ## Endpoints
 
@@ -203,6 +240,9 @@ Deleting a course or a student failed once `waiting_list` added foreign keys. Bo
 | DELETE | /students/{id} | 204 / 404 |
 | GET | /students/{id}/registrations | 200 / 404 |
 | GET | /students/{id}/grades | 200 / 404 |
+| GET | /students/{id}/notification-preferences | 200 / 404 |
+| PUT | /students/{id}/notification-preferences | 200 / 404 |
+| GET | /students/{id}/notifications | 200 / 404 |
 | POST | /courses | 201 / 409 |
 | GET | /courses, /courses/{id} | 200 / 404 |
 | PUT | /courses/{id} | 200 / 400 / 404 / 409 |
@@ -226,6 +266,7 @@ Deleting a course or a student failed once `waiting_list` added foreign keys. Bo
 | POST | /sessions | 201 / 400 |
 | GET | /sessions, /sessions/{id} | 200 / 404 |
 | GET | /sessions?courseId={id} | 200 |
+| PUT | /sessions/{id} | 200 / 400 / 404 |
 | POST | /attendance | 201 / 400 / 409 |
 | GET | /attendance, /attendance/{id} | 200 / 404 |
 | GET | /attendance?studentId={id} | 200 |

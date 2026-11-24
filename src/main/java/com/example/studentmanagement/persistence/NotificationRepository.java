@@ -1,0 +1,13 @@
+package com.example.studentmanagement.persistence;
+
+import com.example.studentmanagement.domain.Notification;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.List;
+
+public interface NotificationRepository extends JpaRepository<Notification, Long> {
+
+    List<Notification> findByStudentIdOrderByCreatedAtDesc(Long studentId);
+
+    void deleteByStudentId(Long studentId);
+}

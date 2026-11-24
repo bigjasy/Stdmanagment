@@ -21,6 +21,9 @@ public class Student extends User {
     @Column(nullable = false)
     private String program;
 
+    @Column(name = "phone_number")
+    private String phoneNumber;
+
     protected Student() {
     }
 
@@ -31,9 +34,14 @@ public class Student extends User {
     }
 
     public void updateProfile(String name, String email, String program) {
+        updateProfile(name, email, program, null);
+    }
+
+    public void updateProfile(String name, String email, String program, String phoneNumber) {
         rename(name);
         this.email = email.trim().toLowerCase();
         this.program = program.trim();
+        this.phoneNumber = phoneNumber == null || phoneNumber.isBlank() ? null : phoneNumber.trim();
     }
 
     public String getEmail() {
@@ -42,5 +50,9 @@ public class Student extends User {
 
     public String getProgram() {
         return program;
+    }
+
+    public String getPhoneNumber() {
+        return phoneNumber;
     }
 }

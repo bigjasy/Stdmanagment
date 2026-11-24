@@ -5,6 +5,8 @@ import com.example.studentmanagement.persistence.AttendanceRepository;
 import com.example.studentmanagement.persistence.GradeRepository;
 import com.example.studentmanagement.persistence.RegistrationRepository;
 import com.example.studentmanagement.persistence.StudentRepository;
+import com.example.studentmanagement.persistence.NotificationPreferenceRepository;
+import com.example.studentmanagement.persistence.NotificationRepository;
 import com.example.studentmanagement.persistence.WaitingListRepository;
 import com.example.studentmanagement.shared.ApiException;
 import com.example.studentmanagement.web.dto.StudentRequest;
@@ -23,17 +25,23 @@ public class StudentService {
     private final GradeRepository grades;
     private final AttendanceRepository attendances;
     private final WaitingListRepository waitingList;
+    private final NotificationRepository notifications;
+    private final NotificationPreferenceRepository notificationPreferences;
 
     public StudentService(StudentRepository students,
                           RegistrationRepository registrations,
                           GradeRepository grades,
                           AttendanceRepository attendances,
-                          WaitingListRepository waitingList) {
+                          WaitingListRepository waitingList,
+                          NotificationRepository notifications,
+                          NotificationPreferenceRepository notificationPreferences) {
         this.students = students;
         this.registrations = registrations;
         this.grades = grades;
         this.attendances = attendances;
         this.waitingList = waitingList;
+        this.notifications = notifications;
+        this.notificationPreferences = notificationPreferences;
     }
 
     public StudentResponse create(StudentRequest request) {
@@ -55,7 +63,7 @@ public class StudentService {
     public StudentResponse update(Long id, StudentRequest request) {
         Student student = load(id);
         rejectDuplicateEmail(request.email(), id);
-        student.updateProfile(request.name(), request.email(), request.program());
+        student.updateProfile(request.name(), request.email(), request.program(), request.phoneNumber());
         return StudentResponse.of(student);
     }
 
@@ -63,6 +71,8 @@ public class StudentService {
         load(id);
         attendances.deleteByStudentId(id);
         waitingList.deleteByStudentId(id);
+        notifications.deleteByStudentId(id);
+        notificationPreferences.deleteByStudentId(id);
         grades.deleteByStudentId(id);
         registrations.deleteByStudentId(id);
         students.deleteById(id);
