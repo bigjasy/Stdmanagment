@@ -1,5 +1,6 @@
 package com.example.studentmanagement.service;
 
+import com.example.studentmanagement.academic.AcademicClient;
 import com.example.studentmanagement.domain.AcademicCalendar;
 import com.example.studentmanagement.domain.Course;
 import com.example.studentmanagement.domain.PrerequisitePolicy;
@@ -34,6 +35,7 @@ public class RegistrationService {
     private final CourseService courses;
     private final Clock clock;
     private final NotificationService notifications;
+    private final AcademicClient academic;
 
     public RegistrationService(RegistrationRepository registrations,
                                GradeRepository grades,
@@ -41,7 +43,8 @@ public class RegistrationService {
                                StudentService students,
                                CourseService courses,
                                Clock clock,
-                               NotificationService notifications) {
+                               NotificationService notifications,
+                               AcademicClient academic) {
         this.registrations = registrations;
         this.grades = grades;
         this.waitingList = waitingList;
@@ -49,10 +52,12 @@ public class RegistrationService {
         this.courses = courses;
         this.clock = clock;
         this.notifications = notifications;
+        this.academic = academic;
     }
 
     public Enrollment create(RegistrationRequest request) {
         Student student = findStudent(request.studentId());
+        academic.requireActiveEnrollment(student);
         Course course = findCourseForUpdate(request.courseId());
         verifyPrerequisites(course, student);
         rejectDuplicate(student, course);

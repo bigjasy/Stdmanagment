@@ -1,5 +1,6 @@
 package com.example.studentmanagement.service;
 
+import com.example.studentmanagement.academic.AcademicClient;
 import com.example.studentmanagement.domain.Course;
 import com.example.studentmanagement.domain.Exam;
 import com.example.studentmanagement.domain.Grade;
@@ -26,6 +27,9 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -43,6 +47,8 @@ class RegistrationServiceTest {
     private CourseService courses;
     @Mock
     private NotificationService notifications;
+    @Mock
+    private AcademicClient academic;
 
     private RegistrationService service;
     private Student student;
@@ -51,7 +57,7 @@ class RegistrationServiceTest {
     @BeforeEach
     void setUp() {
         Clock clock = Clock.fixed(LocalDate.of(2026, 11, 24).atStartOfDay().toInstant(ZoneOffset.UTC), ZoneOffset.UTC);
-        service = new RegistrationService(registrations, grades, waitingList, students, courses, clock, notifications);
+        service = new RegistrationService(registrations, grades, waitingList, students, courses, clock, notifications, academic);
         student = TestIds.withId(new Student("Ada", "ada@school.test", "CS"), 1L);
         course = TestIds.withId(new Course("CS101", "Algorithms", 1), 2L);
     }
@@ -148,5 +154,18 @@ class RegistrationServiceTest {
         RegistrationResponse response = service.create(new RegistrationRequest(1L, 2L)).registration();
 
         assertThat(response.status()).isEqualTo(RegistrationStatus.VALIDATED);
+    }
+
+    @Test
+    void createStopsBeforeTheCourseLockWhenAcademicRefuses() {
+        when(students.load(1L)).thenReturn(student);
+        doThrow(ApiException.badRequest("Student 1 is not active in Academic"))
+                .when(academic).requireActiveEnrollment(student);
+
+        assertThatThrownBy(() -> service.create(new RegistrationRequest(1L, 2L)))
+                .isInstanceOf(ApiException.class)
+                .hasMessage("Student 1 is not active in Academic");
+        verify(courses, never()).loadForUpdate(any());
+        verify(registrations, never()).save(any());
     }
 }

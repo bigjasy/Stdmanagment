@@ -5,7 +5,7 @@ Independent implementation of the student-management API. The rules match the ex
 Branches:
 
 - `main` starts as the base API below. Each exercise is added on the next branch and then merged forward.
-- `change-1` through `change-6` are the exercises. Open the branch README at the **Changes N** section to see which classes moved and which behavior changed.
+- `change-1` through `change-7` are the exercises. Open the branch README at the **Changes N** section to see which classes moved and which behavior changed.
 
 ## Prerequisites
 
@@ -35,7 +35,7 @@ The API listens on http://localhost:8080.
 
     mvn test
 
-The suite does not need MySQL. This branch has **36 tests**.
+The suite does not need MySQL. This branch has **43 tests**.
 
 ## Git hooks
 
@@ -250,11 +250,57 @@ About 2 hours, including a full `mvn test` run on JDK 17.
 
 Refreshing a mirrored exam would have changed the date and category that course grades and prerequisite checks already used. A graded mirror now freezes those fields.
 
+## Changes 7 — Academic is a logical name
+
+Registration asks Academic whether the student is actively enrolled before it locks the course. The call uses `RestTemplate`, and the business code only knows the name `academic`.
+
+The starting point was a single physical address, `http://localhost:8082`, written into the registration logic. A host or port change then required a code change. Several Academic instances could not be reached, and a frontend that learned those addresses would depend on the internal layout.
+
+The instances now live in configuration:
+
+```properties
+discovery.services.academic[0]=http://localhost:8082
+discovery.services.academic[1]=http://localhost:8083
+```
+
+Each registration starts at the next instance. A connection failure or HTTP 5xx tries the following instance. If every instance is down, the API answers **503** with `Academic service is unavailable` and does not include the host or the port. HTTP 404 is an answer from Academic (`400`, student unknown) and does not move on. An inactive enrollment is **400** and does not create a registration or a waiting-list entry.
+
+Academic is expected at `GET {instance}/students/{id}/enrollment` with JSON `{"studentId":1,"active":true,"program":"CS"}`.
+
+The frontend only calls this API on port 8080. Registration and error payloads do not carry Academic's address.
+
+### How many classes were changed
+
+**11 Java classes** — 8 production and 3 test classes, plus this README, `application.properties`, and the test workflow:
+
+- Production added: `AcademicClient`, `AcademicEnrollment`, `RestTemplateAcademicClient`, `AcademicClientConfig`, `ServiceDirectory`, `DiscoveryProperties`, `ConfiguredServiceDirectory`.
+- Production updated: `RegistrationService`.
+- Tests added: `RestTemplateAcademicClientTest`, `ConfiguredServiceDirectoryTest`.
+- Tests updated: `RegistrationServiceTest`.
+
+### Functionalities affected
+
+- `POST /registrations` checks Academic before prerequisites, capacity, and the waiting list.
+- An inactive or unknown Academic enrollment is **400**. Every instance down is **503**, and nothing is stored.
+- Changing Academic's host or port is a configuration change. Adding an instance is another `discovery.services.academic` entry.
+
+### Regression tests needed
+
+**7 new tests** (36 → **43 total**): round-robin across two instances, failover, a 503 whose message hides the physical address, a 404 that does not try the next instance, an inactive student, configuration that drops a trailing slash, and a registration that stops before the course lock. The older registration tests use an Academic client that reports the student as active. `mvn test` does not need MySQL or a running Academic service.
+
+### Development and validation time
+
+About 2 hours, including a full `mvn test` run on JDK 17.
+
+### Unrelated functionality that broke
+
+The Academic call sat inside the course lock at first, so a slow or down instance would have held the course row. The check now runs after the student is loaded and before `loadForUpdate`. Cancel, promotion, grades, and exams do not call Academic.
+
 ## Model
 
 - User (id, name, role) is the parent of Student (email, program, optional phone number). Joined inheritance uses the tables `users` and `students`.
 - Course (code, title, capacity, required courses, equivalent courses, midterm weight 30, final weight 50, project weight 20).
-- Registration (student, course, status). A student can register for a course only once, and only when every prerequisite was passed in the previous academic year. A full course places the student on a FIFO waiting list.
+- Registration (student, course, status). A student can register for a course only once, only when Academic reports an active enrollment, and only when every prerequisite was passed in the previous academic year. A full course places the student on a FIFO waiting list.
 - WaitingListEntry (course, student, requestedAt). Position is computed, not stored.
 - Exam (course, date, type `MIDTERM`, `FINAL`, or `PROJECT`, external id, status `ACTIVE`, `CANCELLED`, or `UNKNOWN`).
 - Grade (exam, student, value from 0 to 20, status `VALIDATED` or `PENDING_ADMIN_DECISION`, block reason). One grade per student and exam.
@@ -288,7 +334,7 @@ Refreshing a mirrored exam would have changed the date and category that course 
 | DELETE | /courses/{id}/equivalents/{equivalentCourseId} | 200 / 400 / 404 |
 | PUT | /courses/{id}/weights | 200 / 400 / 404 |
 | GET | /courses/{id}/grades/{studentId} | 200 / 404 |
-| POST | /registrations | 201 (registered) / 202 (waiting list) / 400 / 409 |
+| POST | /registrations | 201 (registered) / 202 (waiting list) / 400 / 409 / 503 |
 | DELETE | /registrations/{id} | 204 / 404 |
 | GET | /registrations/waiting-list?courseId={id} | 200 / 404 |
 | DELETE | /registrations/waiting-list/{id} | 204 / 404 |
@@ -313,3 +359,5 @@ Refreshing a mirrored exam would have changed the date and category that course 
     curl -X POST localhost:8080/exams -H "Content-Type: application/json" -d "{\"courseId\":1,\"date\":\"2026-12-20\"}"
     curl -X POST localhost:8080/grades -H "Content-Type: application/json" -d "{\"examId\":1,\"studentId\":1,\"value\":15.5}"
     curl localhost:8080/students/1/grades
+
+`POST /registrations` also needs Academic. By default it tries `http://localhost:8082` and then `http://localhost:8083`, at `GET /students/{id}/enrollment`. The caller still uses port 8080 only. If both instances are down, the registration answers 503 and stores nothing.
